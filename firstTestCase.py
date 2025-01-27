@@ -1,32 +1,67 @@
+import pickle
+import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
+def loadCookies(driver, cookies_file):
+    try:
+        cookies = pickle.load(open(cookies_file, "rb"))
+        for cookie in cookies:
+            driver.add_cookie(cookie)
+        driver.refresh()
+    except FileNotFoundError:
+        print("Cookies file not found. You need to log in.")
+    except Exception as e:
+        print(f"Error loading cookies: {e}")
+
+def saveCookies(driver, cookies_file):
+    pickle.dump(driver.get_cookies(), open(cookies_file, "wb"))
+
 driver = webdriver.Chrome()
 
 driver.get("https://dolap.com/giris")
 
+cookies_file = "cookies.pkl"
 
-usernameBox = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.XPATH, '//*[@id="login-form"]/div[2]/input'))
-)
+loadCookies(driver, cookies_file)
 
-passwordBox = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.XPATH, '//*[@id="login-form"]/div[3]/input'))
-)
+time.sleep(3)
 
-loginButton = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
-)
+try:
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="profileLink"]'))
+    )
+    print("Already logged in (using saved cookies).")
+except:
+    print("Logging in using credentials...")
 
+    usernameBox = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="login-form"]/div[2]/input'))
+    )
 
-usernameBox.send_keys("")
-passwordBox.send_keys("")
-loginButton.click()
-profileLink = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.XPATH, '//*[@id="profileLink"]'))
-)
+    passwordBox = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="login-form"]/div[3]/input'))
+    )
+
+    loginButton = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
+    )
+
+    usernameBox.send_keys("")
+    passwordBox.send_keys("")
+    loginButton.click()
+
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="profileLink"]'))
+    )
+
+    saveCookies(driver, cookies_file)
+
+time.sleep(2)
+
 search = WebDriverWait(driver, 10).until(
     EC.element_to_be_clickable((By.XPATH, '//*[@id="search"]'))
 )
