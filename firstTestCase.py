@@ -21,8 +21,8 @@ loginButton = WebDriverWait(driver, 10).until(
 )
 
 
-usernameBox.send_keys("zelihapayci377@gmail.com")
-passwordBox.send_keys("Ay!szK1992")
+usernameBox.send_keys("")
+passwordBox.send_keys("")
 loginButton.click()
 profileLink = WebDriverWait(driver, 10).until(
     EC.element_to_be_clickable((By.XPATH, '//*[@id="profileLink"]'))
