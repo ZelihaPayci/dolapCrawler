@@ -1,5 +1,6 @@
 import pickle
 import time
+import re
 import asyncio
 from telegram import Bot, Update
 from telegram.ext import CommandHandler, MessageHandler, Application, filters
@@ -41,6 +42,13 @@ def parsePrice(price_string):
     except ValueError:
         return None
 
+def normalizeSize(size):
+    if '-' in size:
+        size = size.split('-')[-1]
+
+    normalized = re.sub(r"[^a-zA-Z]", "", size).strip()
+
+    return normalized.upper()
 async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition):
     driver = webdriver.Chrome()
 
@@ -139,7 +147,13 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                     print(f"Failed to parse price: {productPrice}")
                     continue
 
-                if desired_size in productSize and desired_condition in productCondition and price <= float(desired_price):
+                normalized_desired_size = normalizeSize(desired_size)
+                normalized_product_size = normalizeSize(productSize)
+
+                print("product size" + normalized_product_size)
+                print("desired" + normalized_desired_size)
+
+                if normalized_product_size in normalized_desired_size and desired_condition in productCondition and price <= float(desired_price):
                     print(f"Product matches! Size: {productSize}, Condition: {productCondition}, Price: {price}")
                     matchingProductsLinks.append(productUrl)
 
