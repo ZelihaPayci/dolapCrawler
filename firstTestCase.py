@@ -9,7 +9,75 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+import sqlite3
 
+def create_sent_products_table():
+    conn = sqlite3.connect("sent_products.db")
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS sent_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Unique ID for tracking
+        url TEXT UNIQUE,                       -- Product URL (must be unique)
+        title TEXT,                            -- Product title
+        size TEXT,                             -- Product size
+        condition TEXT,                        -- Product condition
+        price REAL,                            -- Product price (stored as float)
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP -- Timestamp when it was added
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+# Call this function once to create the database
+create_sent_products_table()
+
+
+def add_sent_product(url, title, size, condition, price):
+    try:
+        print(f"Adding product to DB: url={url}, title={title}, size={size}, condition={condition}, price={price}")
+        print(
+            f"Types: url={type(url)}, title={type(title)}, size={type(size)}, condition={type(condition)}, price={type(price)}")
+
+        # Ensure that all fields except 'price' are either strings or None
+        if not all(isinstance(param, (str, type(None))) for param in [url, title, size, condition]):
+            raise ValueError("All fields except 'price' should be strings or None")
+
+        if price is None:
+            raise ValueError("Price cannot be None")
+
+        conn = sqlite3.connect("sent_products.db")
+        cursor = conn.cursor()
+
+        cursor.execute('''
+        INSERT OR IGNORE INTO sent_products (url, title, size, condition, price)
+        VALUES (?, ?, ?, ?, ?)
+        ''', (url, title, size, condition, price))
+
+        conn.commit()
+        conn.close()
+        print(f"Sent product added to database: {title}")
+    except Exception as e:
+        print(f"Error adding sent product to database: {e}")
+
+
+def is_product_sent(url):
+    try:
+        conn = sqlite3.connect("sent_products.db")
+        cursor = conn.cursor()
+
+        # Check if the URL exists in the database
+        cursor.execute('''
+        SELECT 1 FROM sent_products WHERE url = ?
+        ''', (url,))
+        result = cursor.fetchone()
+
+        conn.close()
+        return result is not None  # Returns True if the URL exists
+    except Exception as e:
+        print(f"Error checking if product is sent: {e}")
+        return False
 
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
@@ -40,9 +108,10 @@ def saveCookies(driver, cookies_file):
 def parsePrice(price_string):
     try:
         price_string = price_string.replace('₺', '').replace('TL', '').replace(',', '').replace('.', '').strip()
-        return float(price_string)
+        return float(price_string) if price_string else None
     except ValueError:
         return None
+
 
 def normalizeSize(size):
     if '-' in size:
@@ -130,6 +199,10 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                 productLink = product.find_element(By.XPATH, ".//div[@class='img-block']//a[@rel='nofollow']")
                 productUrl = productLink.get_attribute("href")
 
+                if is_product_sent(productUrl):
+                    print(f"Product {productUrl} already in the database. Skipping...")
+                    continue
+
                 print("Navigating to:", productUrl)
 
                 driver.get(productUrl)
@@ -170,6 +243,9 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                     matchingProductsLinks.append(productUrl)
 
                     await send_telegram_notification(productUrl, productImageUrl)
+
+                    add_sent_product(str(productUrl), productSize, normalized_product_size, productCondition, price)
+
 
                 driver.back()
 
