@@ -9,6 +9,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
+
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -37,18 +39,25 @@ def saveCookies(driver, cookies_file):
 
 def parsePrice(price_string):
     try:
-        price_string = price_string.replace('₺', '').replace('TL', '').replace(',', '').strip()
+        price_string = price_string.replace('₺', '').replace('TL', '').replace(',', '').replace('.', '').strip()
         return float(price_string)
     except ValueError:
         return None
 
 def normalizeSize(size):
     if '-' in size:
-        size = size.split('-')[-1]
+        size = size.split('-')[-1].strip()
 
-    normalized = re.sub(r"[^a-zA-Z]", "", size).strip()
+    parts = re.split(r'\s*/\s*', size)
 
-    return normalized.upper()
+    normalized_parts = []
+    for part in parts:
+        match = re.match(r"([A-Za-z0-9]+)", part)
+        if match:
+            normalized_parts.append(match.group(1).upper())
+
+    return "".join(normalized_parts)
+
 async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition):
     driver = webdriver.Chrome()
 
@@ -153,7 +162,10 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                 print("product size" + normalized_product_size)
                 print("desired" + normalized_desired_size)
 
-                if normalized_product_size in normalized_desired_size and desired_condition in productCondition and price <= float(desired_price):
+                print("input price: " + desired_price)
+                print("product price: " + str(price))
+
+                if normalized_product_size == normalized_desired_size and desired_condition in productCondition and price <= float(desired_price):
                     print(f"Product matches! Size: {productSize}, Condition: {productCondition}, Price: {price}")
                     matchingProductsLinks.append(productUrl)
 
