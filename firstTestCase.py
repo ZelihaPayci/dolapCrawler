@@ -1,12 +1,12 @@
 import pickle
 import time
 import asyncio
-
+from telegram import Bot, Update
+from telegram.ext import CommandHandler, MessageHandler, Application, filters
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from telegram import Bot
 
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
@@ -34,7 +34,14 @@ def loadCookies(driver, cookies_file):
 def saveCookies(driver, cookies_file):
     pickle.dump(driver.get_cookies(), open(cookies_file, "wb"))
 
-async def scrape_and_notify():
+def parsePrice(price_string):
+    try:
+        price_string = price_string.replace('₺', '').replace('TL', '').replace(',', '').strip()
+        return float(price_string)
+    except ValueError:
+        return None
+
+async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition):
     driver = webdriver.Chrome()
 
     driver.get("https://dolap.com/giris")
@@ -64,8 +71,8 @@ async def scrape_and_notify():
             EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
         )
 
-        usernameBox.send_keys("zelihapayci377@gmail.com")
-        passwordBox.send_keys("Ay!szK1992")
+        usernameBox.send_keys("")
+        passwordBox.send_keys("")
         loginButton.click()
 
         WebDriverWait(driver, 10).until(
@@ -82,7 +89,7 @@ async def scrape_and_notify():
     search = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, '//*[@id="search"]'))
     )
-    search.send_keys("kırmızı kazak")
+    search.send_keys(search_term)
 
     searchForm = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, '//*[@id="header"]/div[1]/form'))
@@ -99,9 +106,6 @@ async def scrape_and_notify():
 
         products = driver.find_elements(By.XPATH, "//div[@class='col-xs-6 col-md-4']")
         matchingProductsLinks = []
-
-        desiredSize = "M Beden"
-        desiredCondition = "Az Kullanılmış"
 
         for i in range(len(products)):
             try:
@@ -123,14 +127,22 @@ async def scrape_and_notify():
                 conditionElement = driver.find_element(By.XPATH, "//div[@class='title-block']//span[@class='subtitle']")
                 productCondition = conditionElement.text.strip()
 
+                priceElement = driver.find_element(By.XPATH, "//*[@id=\"main\"]/div/div/div[1]/div[2]/div/div[2]/div[1]/span")
+                productPrice = priceElement.text.strip()
+
                 productImageElement = driver.find_element(By.XPATH, "//*[@id=\"main\"]/div/div/div[1]/div[1]/div/div[2]/div/ul/li[1]/a/img")
                 productImageUrl = productImageElement.get_attribute("src")
 
-                if desiredSize in productSize and desiredCondition in productCondition:
-                    print(f"Product matches! Size: {productSize}, Condition: {productCondition}")
+                price = parsePrice(productPrice)
+
+                if price is None:
+                    print(f"Failed to parse price: {productPrice}")
+                    continue
+
+                if desired_size in productSize and desired_condition in productCondition and price <= float(desired_price):
+                    print(f"Product matches! Size: {productSize}, Condition: {productCondition}, Price: {price}")
                     matchingProductsLinks.append(productUrl)
 
-                    # Await the Telegram notification function
                     await send_telegram_notification(productUrl, productImageUrl)
 
                 driver.back()
@@ -149,7 +161,7 @@ async def scrape_and_notify():
 
         try:
             next_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/div/div[2]/div[2]/div/ul[2]/li[8]/a'))
+                EC.element_to_be_clickable((By.XPATH, '//li[@class="next"]/a'))
             )
             next_button.click()
             currentPage += 1
@@ -160,5 +172,32 @@ async def scrape_and_notify():
 
     print("Scraping complete!")
 
-if __name__ == "__main__":
-    asyncio.run(scrape_and_notify())
+async def start(update, context):
+    await update.message.reply_text(
+        "Welcome to the product search bot! Please provide your search criteria.\n"
+        "Format: \nsearch: <product_name>, size: <desired_size>, price: <desired_price>, condition: <desired_condition>\n"
+        "Example: search: kırmızı kazak, size: M Beden, price: 200, condition: Az Kullanılmış"
+    )
+
+async def handle_message(update, context):
+    text = update.message.text
+    print(f"Received input: {text}")
+
+    try:
+        parts = text.split(',')
+        search_term = parts[0].split(':')[1].strip()
+        desired_size = parts[1].split(':')[1].strip()
+        desired_price = parts[2].split(':')[1].strip()
+        desired_condition = parts[3].split(':')[1].strip()
+
+        await scrape_and_notify(search_term, desired_size, desired_price, desired_condition)
+
+    except Exception as e:
+        await update.message.reply_text(f"Error processing your input: {e}")
+
+application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+application.run_polling()
