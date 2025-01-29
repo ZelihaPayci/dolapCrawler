@@ -1,3 +1,4 @@
+import os
 import pickle
 import time
 import re
@@ -10,6 +11,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 import sqlite3
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def create_sent_products_table():
     conn = sqlite3.connect("sent_products.db")
@@ -79,8 +84,8 @@ def is_product_sent(url):
         print(f"Error checking if product is sent: {e}")
         return False
 
-TELEGRAM_BOT_TOKEN = ""
-TELEGRAM_CHAT_ID = ""
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 async def send_telegram_notification(product_url, product_image):
@@ -157,8 +162,10 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
             EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
         )
 
-        usernameBox.send_keys("")
-        passwordBox.send_keys("")
+        EMAIL_USERNAME = os.getenv("EMAIL_USERNAME")
+        EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+        usernameBox.send_keys("EMAIL_USERNAME")
+        passwordBox.send_keys("EMAIL_PASSWORD")
         loginButton.click()
 
         WebDriverWait(driver, 10).until(
