@@ -79,8 +79,8 @@ def is_product_sent(url):
         print(f"Error checking if product is sent: {e}")
         return False
 
-TELEGRAM_BOT_TOKEN = "7491864666:AAHNLIxJ7k5bruZliXeLmWIGO_W298cHiJw"
-TELEGRAM_CHAT_ID = "6306510208"
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 async def send_telegram_notification(product_url, product_image):
@@ -157,8 +157,8 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
             EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
         )
 
-        usernameBox.send_keys("zelihapayci377@gmail.com")
-        passwordBox.send_keys("Ay!szK1992")
+        usernameBox.send_keys("")
+        passwordBox.send_keys("")
         loginButton.click()
 
         WebDriverWait(driver, 10).until(
