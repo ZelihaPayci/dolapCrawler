@@ -79,8 +79,8 @@ def is_product_sent(url):
         print(f"Error checking if product is sent: {e}")
         return False
 
-TELEGRAM_BOT_TOKEN = ""
-TELEGRAM_CHAT_ID = ""
+TELEGRAM_BOT_TOKEN = "7491864666:AAHNLIxJ7k5bruZliXeLmWIGO_W298cHiJw"
+TELEGRAM_CHAT_ID = "6306510208"
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 async def send_telegram_notification(product_url, product_image):
@@ -157,8 +157,8 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
             EC.element_to_be_clickable((By.XPATH, '//*[@id="login-button"]'))
         )
 
-        usernameBox.send_keys("")
-        passwordBox.send_keys("")
+        usernameBox.send_keys("zelihapayci377@gmail.com")
+        passwordBox.send_keys("Ay!szK1992")
         loginButton.click()
 
         WebDriverWait(driver, 10).until(
@@ -182,6 +182,21 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
     )
 
     searchForm.submit()
+
+    dropdown_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/div/div[2]/div[2]/div/div[1]/div[2]/span'))
+    )
+
+    dropdown_button.click()
+    time.sleep(1)
+
+    newest_to_oldest_option = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable(
+            (By.XPATH, '//span[@class=\'jcf-option\' and text()=\'Yeniden Eskiye\']'))
+    )
+    newest_to_oldest_option.click()
+
+    time.sleep(2)
 
     while currentPage <= maxPage:
         print(f"Scraping page {currentPage}...")
