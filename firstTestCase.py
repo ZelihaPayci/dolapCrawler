@@ -293,7 +293,7 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                 print("input price: " + desired_price)
                 print("product price: " + str(price))
 
-                if normalized_desired_size in normalized_product_size and desired_condition in productCondition and price <= float(desired_price):
+                if normalized_desired_size == normalized_product_size and desired_condition in productCondition and price <= float(desired_price):
                     print(f"Product matches! Size: {productSize}, Condition: {productCondition}, Price: {price}")
                     matchingProductsLinks.append(productUrl)
 
