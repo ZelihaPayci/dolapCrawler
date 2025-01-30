@@ -36,7 +36,7 @@ def create_sent_products_table():
 
 def create_search_criteria_table():
     try:
-        conn = sqlite3.connect("sent_products.db")
+        conn = sqlite3.connect("search_criteria.db")
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -62,7 +62,7 @@ create_search_criteria_table()
 create_sent_products_table()
 
 def save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id):
-    conn = sqlite3.connect("sent_products.db")
+    conn = sqlite3.connect("search_criteria.db")
     cursor = conn.cursor()
 
     cursor.execute('''
