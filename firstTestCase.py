@@ -1,8 +1,6 @@
-import os
 import pickle
 import time
 import re
-import asyncio
 from telegram import Bot, Update
 from telegram.ext import CommandHandler, MessageHandler, Application, filters
 from selenium import webdriver
@@ -23,6 +21,7 @@ def create_sent_products_table():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS sent_products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Unique ID for tracking
+        search_id INTEGER, 
         url TEXT UNIQUE,                       -- Product URL (must be unique)
         title TEXT,                            -- Product title
         size TEXT,                             -- Product size
@@ -35,9 +34,44 @@ def create_sent_products_table():
     conn.commit()
     conn.close()
 
-# Call this function once to create the database
+def create_search_criteria_table():
+    try:
+        conn = sqlite3.connect("sent_products.db")
+        cursor = conn.cursor()
+
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS search_criteria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            search_term TEXT,
+            desired_size TEXT,
+            desired_price REAL,
+            desired_condition TEXT,
+            chat_id TEXT
+        )
+        ''')
+
+        conn.commit()
+        conn.close()
+        print("search_criteria table created successfully.")
+    except Exception as e:
+        print(f"Error creating search_criteria table: {e}")
+
+
+create_search_criteria_table()
+
 create_sent_products_table()
 
+def save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id):
+    conn = sqlite3.connect("sent_products.db")
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    INSERT INTO search_criteria (search_term, desired_size, desired_price, desired_condition, chat_id)
+    VALUES (?, ?, ?, ?, ?)
+    ''', (search_term, desired_size, float(desired_price), desired_condition, chat_id))
+
+    conn.commit()
+    conn.close()
 
 def add_sent_product(url, title, size, condition, price):
     try:
@@ -72,14 +106,13 @@ def is_product_sent(url):
         conn = sqlite3.connect("sent_products.db")
         cursor = conn.cursor()
 
-        # Check if the URL exists in the database
         cursor.execute('''
         SELECT 1 FROM sent_products WHERE url = ?
         ''', (url,))
         result = cursor.fetchone()
 
         conn.close()
-        return result is not None  # Returns True if the URL exists
+        return result is not None
     except Exception as e:
         print(f"Error checking if product is sent: {e}")
         return False
@@ -132,7 +165,7 @@ def normalizeSize(size):
 
     return "".join(normalized_parts)
 
-async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition):
+async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition, chat_id):
     driver = webdriver.Chrome()
 
     driver.get("https://dolap.com/giris")
@@ -260,7 +293,7 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
                 print("input price: " + desired_price)
                 print("product price: " + str(price))
 
-                if normalized_product_size == normalized_desired_size and desired_condition in productCondition and price <= float(desired_price):
+                if normalized_desired_size in normalized_product_size and desired_condition in productCondition and price <= float(desired_price):
                     print(f"Product matches! Size: {productSize}, Condition: {productCondition}, Price: {price}")
                     matchingProductsLinks.append(productUrl)
 
@@ -305,6 +338,7 @@ async def start(update, context):
 
 async def handle_message(update, context):
     text = update.message.text
+    chat_id = update.message.chat_id
     print(f"Received input: {text}")
 
     try:
@@ -314,15 +348,19 @@ async def handle_message(update, context):
         desired_price = parts[2].split(':')[1].strip()
         desired_condition = parts[3].split(':')[1].strip()
 
-        await scrape_and_notify(search_term, desired_size, desired_price, desired_condition)
+        save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id)
+
+        await scrape_and_notify(search_term, desired_size, desired_price, desired_condition, chat_id)
 
     except Exception as e:
         await update.message.reply_text(f"Error processing your input: {e}")
 
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+tgBot = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
 
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+tgBot.add_handler(CommandHandler("start", start))
+tgBot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-application.run_polling()
+tgBot.run_polling()
+
+
