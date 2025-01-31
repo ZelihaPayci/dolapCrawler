@@ -70,10 +70,14 @@ def save_search_criteria(search_term, desired_size, desired_price, desired_condi
     VALUES (?, ?, ?, ?, ?)
     ''', (search_term, desired_size, float(desired_price), desired_condition, chat_id))
 
+    search_id = cursor.lastrowid
+
     conn.commit()
     conn.close()
 
-def add_sent_product(url, title, size, condition, price):
+    return search_id
+
+def add_sent_product(search_id, url, title, size, condition, price):
     try:
         print(f"Adding product to DB: url={url}, title={title}, size={size}, condition={condition}, price={price}")
         print(
@@ -90,9 +94,9 @@ def add_sent_product(url, title, size, condition, price):
         cursor = conn.cursor()
 
         cursor.execute('''
-        INSERT OR IGNORE INTO sent_products (url, title, size, condition, price)
-        VALUES (?, ?, ?, ?, ?)
-        ''', (url, title, size, condition, price))
+        INSERT OR IGNORE INTO sent_products (search_id, url, title, size, condition, price)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ''', (search_id, url, title, size, condition, price))
 
         conn.commit()
         conn.close()
@@ -165,7 +169,7 @@ def normalizeSize(size):
 
     return "".join(normalized_parts)
 
-async def scrape_and_notify(search_term, desired_size, desired_price, desired_condition, chat_id):
+async def scrape_and_notify(search_id, search_term, desired_size, desired_price, desired_condition, chat_id):
     driver = webdriver.Chrome()
 
     driver.get("https://dolap.com/giris")
@@ -197,8 +201,8 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
 
         EMAIL_USERNAME = os.getenv("EMAIL_USERNAME")
         EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-        usernameBox.send_keys("EMAIL_USERNAME")
-        passwordBox.send_keys("EMAIL_PASSWORD")
+        usernameBox.send_keys(EMAIL_USERNAME)
+        passwordBox.send_keys(EMAIL_PASSWORD)
         loginButton.click()
 
         WebDriverWait(driver, 10).until(
@@ -299,7 +303,7 @@ async def scrape_and_notify(search_term, desired_size, desired_price, desired_co
 
                     await send_telegram_notification(productUrl, productImageUrl)
 
-                    add_sent_product(str(productUrl), productSize, normalized_product_size, productCondition, price)
+                    add_sent_product(search_id, str(productUrl), productSize, normalized_product_size, productCondition, price)
 
 
                 driver.back()
@@ -348,9 +352,9 @@ async def handle_message(update, context):
         desired_price = parts[2].split(':')[1].strip()
         desired_condition = parts[3].split(':')[1].strip()
 
-        save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id)
+        search_id = save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id)
 
-        await scrape_and_notify(search_term, desired_size, desired_price, desired_condition, chat_id)
+        await scrape_and_notify(search_id, search_term, desired_size, desired_price, desired_condition, chat_id)
 
     except Exception as e:
         await update.message.reply_text(f"Error processing your input: {e}")
