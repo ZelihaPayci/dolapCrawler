@@ -336,10 +336,25 @@ async def scrape_and_notify(search_id, search_term, desired_size, desired_price,
 async def start(update, context):
     await update.message.reply_text(
         "Welcome to the product search bot! Please provide your search criteria.\n"
-        "Format: \nsearch: <product_name>, size: <desired_size>, price: <desired_price>, condition: <desired_condition>\n"
-        "Example: search: kırmızı kazak, size: M Beden, price: 200, condition: Az Kullanılmış"
+        "Format: \nsearch: <product_name>, size: <desired_size>, price: <desired_price>, condition: <desired_condition>, chat_id: <chat_id>\n"
+        "Example: search: kırmızı kazak, size: M Beden, price: 200, condition: Az Kullanılmış, chat_id: #"
     )
 
+
+import asyncio
+import schedule
+
+active_searches = {}
+def start_scheduled_search(search_id, search_term, desired_size, desired_price, desired_condition, chat_id):
+    """Schedules the scraping task for the given search parameters."""
+
+    async def job():
+        await scrape_and_notify(search_id, search_term, desired_size, desired_price, desired_condition, chat_id)
+
+    job_instance = schedule.every(1).hour.do(lambda: asyncio.create_task(job()))
+
+    active_searches[chat_id] = job_instance
+    print(f"Scheduled search for chat_id {chat_id} every hour.")
 async def handle_message(update, context):
     text = update.message.text
     chat_id = update.message.chat_id
@@ -354,17 +369,35 @@ async def handle_message(update, context):
 
         search_id = save_search_criteria(search_term, desired_size, desired_price, desired_condition, chat_id)
 
-        await scrape_and_notify(search_id, search_term, desired_size, desired_price, desired_condition, chat_id)
+        start_scheduled_search(search_id, search_term, desired_size, desired_price, desired_condition, chat_id)
+
+        await update.message.reply_text("Search started! You'll receive notifications every hour.")
 
     except Exception as e:
         await update.message.reply_text(f"Error processing your input: {e}")
+async def stop(update, context):
+    """Stops the scheduled job for the user's chat_id."""
+    chat_id = update.message.chat_id
+
+    if chat_id in active_searches:
+        schedule.cancel_job(active_searches[chat_id])
+        del active_searches[chat_id]
+        await update.message.reply_text("Your search has been stopped.")
+    else:
+        await update.message.reply_text("No active search found.")
+
+async def run_scheduler():
+    """Runs the scheduler within the event loop."""
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 tgBot = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-
 tgBot.add_handler(CommandHandler("start", start))
+tgBot.add_handler(CommandHandler("stop", stop))
 tgBot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+tgBot.loop.create_task(run_scheduler())
+
 tgBot.run_polling()
-
-
